@@ -7,3 +7,4 @@
 include:
   - path: ../compose/RabbitMQ/docker-compose.yml
   - path: ../compose/postgres/docker-compose.yml
+  - path: ../compose/camunda/docker-compose.yml

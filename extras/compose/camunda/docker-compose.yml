@@ -1,0 +1,18 @@
+services:
+  camunda:
+    image: camunda/camunda:8.7.0
+    container_name: camunda
+    ports:
+      - "8080:8080"   # Camunda Web UI (Tasklist, Operate)
+      - "26500:26500" # Zeebe Gateway (für Worker-Verbindung)
+      - "9600:9600"   # Zeebe Monitoring
+    environment:
+      - CAMUNDA_OPERATE_ENABLED=true
+      - CAMUNDA_TASKLIST_ENABLED=true
+      - CAMUNDA_OPTIMIZE_ENABLED=false
+      - SPRING_PROFILES_ACTIVE=dev
+    volumes:
+      - camunda_data:/usr/local/camunda/data
+
+volumes:
+  camunda_data:
