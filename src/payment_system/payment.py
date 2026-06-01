@@ -1,15 +1,28 @@
+import os
 import pika
 import json
 import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DB_HOST     = os.getenv("DB_HOST", "localhost")
+DB_NAME     = os.getenv("DB_NAME", "invoice_db")
+DB_USER     = os.getenv("DB_USER", "admin")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "secretpassword")
+
+RABBITMQ_HOST     = os.getenv("RABBITMQ_HOST", "localhost")
+RABBITMQ_USER     = os.getenv("RABBITMQ_USER", "user")
+RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "password")
+
 
 def update_invoice_status(rechnungs_nummer):
-    """Verbindet sich mit der DB und setzt den Status auf BEZAHLT."""
     try:
         conn = psycopg2.connect(
-            host="localhost",
-            database="invoice_db",
-            user="admin",
-            password="secretpassword"
+            host=DB_HOST,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD
         )
         with conn.cursor() as cur:
             cur.execute(
@@ -18,34 +31,34 @@ def update_invoice_status(rechnungs_nummer):
             )
             conn.commit()
         conn.close()
-        print(f"   [DB-Update] Status für {rechnungs_nummer} auf 'BEZAHLT' gesetzt.")
+        print(f"[DB] Status für {rechnungs_nummer} auf BEZAHLT gesetzt.")
     except Exception as e:
-        print(f"   [DB-Fehler] Konnte Status nicht aktualisieren: {e}")
+        print(f"[DB] Fehler: {e}")
+
 
 def callback(ch, method, properties, body):
     data = json.loads(body)
     r_nr = data.get("rechnungsnummer")
-    
-    print(f" [x] Empfangen: Rechnung {r_nr}")
-    
-    # JETZT NEU: Status in der Datenbank ändern
+
+    print(f"[Payment] Empfangen: Rechnung {r_nr}")
+
     update_invoice_status(r_nr)
-    
-    # Bestätigung an RabbitMQ (Nachricht wird aus der Queue gelöscht)
+
     ch.basic_ack(delivery_tag=method.delivery_tag)
+
 
 def start_worker():
     connection = pika.BlockingConnection(pika.ConnectionParameters(
-        host='localhost',
-        credentials=pika.PlainCredentials('user', 'password')
+        host=RABBITMQ_HOST,
+        credentials=pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
     ))
     channel = connection.channel()
-    channel.queue_declare(queue='zahlungs_auftraege', durable=True)
+    channel.queue_declare(queue="zahlungs_auftraege", durable=True)
+    channel.basic_consume(queue="zahlungs_auftraege", on_message_callback=callback)
 
-    channel.basic_consume(queue='zahlungs_auftraege', on_message_callback=callback)
-
-    print(' [*] Payment-Worker wartet auf Nachrichten. Drücke STRG+C zum Beenden.')
+    print("[Payment] Wartet auf Nachrichten...")
     channel.start_consuming()
+
 
 if __name__ == "__main__":
     start_worker()
